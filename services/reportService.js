@@ -35,7 +35,7 @@ class ReportService {
     // Apply area restrictions based on user role
     let userWhereClause = {};
     if (currentUserRole === 'jefe_desarrollo') {
-      userWhereClause.role = { [Op.in]: ['jefe_desarrollo', 'desarrollador'] };
+      userWhereClause.role = { [Op.in]: ['jefe_desarrollo', 'desarrollador', 'disenador'] };
     } else if (currentUserRole === 'jefe_workforce') {
       userWhereClause.role = { [Op.in]: ['jefe_workforce', 'workforce'] };
     }
@@ -346,7 +346,7 @@ class ReportService {
       const lastActivity = lastTask ? 
         new Date(lastTask.updatedAt).toLocaleDateString() : 'Sin actividad';
 
-      const area = user.role === 'jefe_desarrollo' || user.role === 'desarrollador' ? 
+      const area = user.role === 'jefe_desarrollo' || user.role === 'desarrollador' || user.role === 'disenador' ? 
         'Desarrollo' : 'Workforce';
 
       return {
@@ -553,7 +553,7 @@ class ReportService {
 
     // Area comparison
     const developmentUsers = data.users.filter(u => 
-      u.role === 'jefe_desarrollo' || u.role === 'desarrollador'
+      u.role === 'jefe_desarrollo' || u.role === 'desarrollador' || u.role === 'disenador'
     );
     const workforceUsers = data.users.filter(u => 
       u.role === 'jefe_workforce' || u.role === 'workforce'

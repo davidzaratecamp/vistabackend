@@ -35,8 +35,8 @@ const validateRegister = [
     .notEmpty()
     .withMessage('Last name is required'),
   body('role')
-    .isIn(['jefe_desarrollo', 'jefe_workforce', 'desarrollador', 'workforce'])
-    .withMessage('Role must be one of: jefe_desarrollo, jefe_workforce, desarrollador, workforce'),
+    .isIn(['jefe_desarrollo', 'jefe_workforce', 'desarrollador', 'workforce', 'disenador'])
+    .withMessage('Role must be one of: jefe_desarrollo, jefe_workforce, desarrollador, workforce, disenador'),
   handleValidationErrors
 ];
 
@@ -55,8 +55,8 @@ const validateUser = [
     .notEmpty()
     .withMessage('Last name is required'),
   body('role')
-    .isIn(['jefe_desarrollo', 'jefe_workforce', 'desarrollador', 'workforce'])
-    .withMessage('Role must be one of: jefe_desarrollo, jefe_workforce, desarrollador, workforce'),
+    .isIn(['jefe_desarrollo', 'jefe_workforce', 'desarrollador', 'workforce', 'disenador'])
+    .withMessage('Role must be one of: jefe_desarrollo, jefe_workforce, desarrollador, workforce, disenador'),
   body('managerId')
     .optional({ nullable: true })
     .if(body('managerId').exists())

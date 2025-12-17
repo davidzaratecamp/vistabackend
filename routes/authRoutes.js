@@ -13,3 +13,12 @@ router.put('/change-password', authenticateToken, authController.changePassword)
 router.post('/logout', authenticateToken, authController.logout);
 
 module.exports = router;
+
+router.get('/debug-user', authenticateToken, (req, res) => {
+  res.json({
+    user: req.user,
+    area: req.user.role === 'jefe_desarrollo' || req.user.role === 'desarrollador' || req.user.role === 'disenador' ? 'desarrollo' : 
+          req.user.role === 'jefe_workforce' || req.user.role === 'workforce' ? 'workforce' : 'undefined'
+  });
+});
+

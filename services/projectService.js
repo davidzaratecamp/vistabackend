@@ -6,10 +6,7 @@ class ProjectService {
     const user = await User.findByPk(userId);
     
     // Determine project area based on user role
-    let area = 'desarrollo';
-    if (user.role === 'jefe_workforce' || user.role === 'workforce') {
-      area = 'workforce';
-    }
+let area = 'desarrollo';    if (user.role === 'jefe_workforce' || user.role === 'workforce') {      area = 'workforce';    }
 
     const project = await Project.create({
       ...projectData,
@@ -64,10 +61,12 @@ class ProjectService {
     }
 
     // Area segregation - users can only see projects from their area
-    if (userRole === 'jefe_desarrollo' || userRole === 'desarrollador') {
+    if (userRole === 'jefe_desarrollo' || userRole === 'desarrollador' || userRole === 'disenador') {
       whereClause.area = 'desarrollo';
     } else if (userRole === 'jefe_workforce' || userRole === 'workforce') {
       whereClause.area = 'workforce';
+    } else {
+      whereClause.area = 'desarrollo'; // Default area
     }
 
     // For non-jefe roles, filter projects where user is a member

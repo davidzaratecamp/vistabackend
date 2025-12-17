@@ -72,10 +72,12 @@ class TaskService {
     }
 
     // Area segregation - users can only see tasks from their area
-    if (userRole === 'jefe_desarrollo' || userRole === 'desarrollador') {
+    if (userRole === 'jefe_desarrollo' || userRole === 'desarrollador' || userRole === 'disenador') {
       whereClause.area = 'desarrollo';
     } else if (userRole === 'jefe_workforce' || userRole === 'workforce') {
       whereClause.area = 'workforce';
+    } else {
+      whereClause.area = 'desarrollo'; // Default area
     }
 
     if (userRole !== 'jefe_desarrollo' && userRole !== 'jefe_workforce') {
@@ -271,7 +273,7 @@ class TaskService {
     };
 
     // Area segregation
-    if (user.role === 'jefe_desarrollo' || user.role === 'desarrollador') {
+    if (user.role === 'jefe_desarrollo' || user.role === 'desarrollador' || user.role === 'disenador') {
       whereClause[Op.and].push({ area: 'desarrollo' });
     } else if (user.role === 'jefe_workforce' || user.role === 'workforce') {
       whereClause[Op.and].push({ area: 'workforce' });
@@ -298,80 +300,6 @@ class TaskService {
 
     return tasks;
   }
-
-  async getTaskStats(userId, projectId = null) {
-    const whereClause = {};
-    
-    if (projectId) {
-      whereClause.projectId = projectId;
-    }
-
-    whereClause[Op.or] = [
-      { assignedTo: userId },
-      { createdBy: userId }
-    ];
-
-    const tasks = await Task.findAll({
-      where: whereClause,
-      attributes: ['status', 'priority']
-    });
-
-    const stats = {
-      total: tasks.length,
-      pendiente: tasks.filter(t => t.status === 'pendiente').length,
-      en_progreso: tasks.filter(t => t.status === 'en_progreso').length,
-      completado: tasks.filter(t => t.status === 'completado').length,
-      by_priority: {
-        baja: tasks.filter(t => t.priority === 'baja').length,
-        media: tasks.filter(t => t.priority === 'media').length,
-        alta: tasks.filter(t => t.priority === 'alta').length,
-        critica: tasks.filter(t => t.priority === 'critica').length
-      }
-    };
-
-    return stats;
-  }
-
-  async updateTaskStatus(taskId, status, userId) {
-    const task = await Task.findByPk(taskId, {
-      include: [
-        {
-          model: Project,
-          as: 'project',
-          attributes: ['id', 'name', 'createdBy']
-        }
-      ]
-    });
-
-    if (!task) {
-      throw new Error('Task not found');
-    }
-
-    // Check if user has permission to update task status
-    // Allow task creator, assignee, project creator, and managers
-    const user = await User.findByPk(userId);
-    const isManager = user.role === 'jefe_desarrollo' || user.role === 'jefe_workforce';
-    const hasPermission = task.createdBy === userId || 
-                         task.assignedTo === userId || 
-                         task.project.createdBy === userId ||
-                         isManager;
-
-    if (!hasPermission) {
-      throw new Error('Not authorized to update this task status');
-    }
-
-    const updateData = { status };
-
-    // Auto-set completion date when marking as completed
-    if (status === 'completado') {
-      updateData.completedDate = new Date();
-    } else if (task.status === 'completado' && status !== 'completado') {
-      // Remove completion date if changing from completed to other status
-      updateData.completedDate = null;
-    }
-
-    await task.update(updateData);
-    return this.getTaskById(taskId, userId);
   }
 }
 
