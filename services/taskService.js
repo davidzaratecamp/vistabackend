@@ -21,7 +21,8 @@ class TaskService {
 
     const task = await Task.create({
       ...taskData,
-      createdBy: userId
+      createdBy: userId,
+      area: project.area // Inherit area from project
     });
 
     return this.getTaskById(task.id, userId);
@@ -70,14 +71,30 @@ class TaskService {
       ];
     }
 
+    // Area segregation - users can only see tasks from their area
+    if (userRole === 'jefe_desarrollo' || userRole === 'desarrollador') {
+      whereClause.area = 'desarrollo';
+    } else if (userRole === 'jefe_workforce' || userRole === 'workforce') {
+      whereClause.area = 'workforce';
+    }
+
     if (userRole !== 'jefe_desarrollo' && userRole !== 'jefe_workforce') {
-      whereClause[Op.or] = [
-        { assignedTo: userId },
-        { createdBy: userId },
+      // Combine area restriction with member/assignment check
+      const existingOr = whereClause[Op.or] || [];
+      whereClause[Op.and] = [
+        { area: whereClause.area }, // Maintain area restriction
         {
-          '$project.members.id$': userId
+          [Op.or]: [
+            { assignedTo: userId },
+            { createdBy: userId },
+            {
+              '$project.members.id$': userId
+            },
+            ...existingOr
+          ]
         }
       ];
+      delete whereClause.area; // Remove area from main where clause since it's now in Op.and
 
       include[2].include = [{
         model: User,
@@ -240,12 +257,24 @@ class TaskService {
   }
 
   async getTasksByUser(userId, filters = {}) {
+    const user = await User.findByPk(userId);
+    
     const whereClause = {
-      [Op.or]: [
-        { assignedTo: userId },
-        { createdBy: userId }
+      [Op.and]: [
+        {
+          [Op.or]: [
+            { assignedTo: userId },
+            { createdBy: userId }
+          ]
+        }
       ]
     };
+
+    // Area segregation
+    if (user.role === 'jefe_desarrollo' || user.role === 'desarrollador') {
+      whereClause[Op.and].push({ area: 'desarrollo' });
+    } else if (user.role === 'jefe_workforce' || user.role === 'workforce') {
+      whereClause[Op.and].push({ area: 'workforce' });
 
     if (filters.status) {
       whereClause.status = filters.status;
@@ -261,7 +290,7 @@ class TaskService {
         {
           model: Project,
           as: 'project',
-          attributes: ['id', 'name']
+          attributes: ['id', 'name', 'area']
         }
       ],
       order: [['updatedAt', 'DESC']]

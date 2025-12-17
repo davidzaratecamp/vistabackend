@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { sequelize } = require('./config/database');
 const { User } = require('./models');
 
@@ -19,7 +20,16 @@ async function updateRoles() {
       WHERE role = 'coordinador'
     `);
 
-        console.log('Users migrated.');
+        console.log('Users migrated from coordinador to jefe_desarrollo.');
+
+        // Remove any users with jefe_tecnologia role
+        console.log('Removing users with jefe_tecnologia role...');
+        await sequelize.query(`
+      DELETE FROM users 
+      WHERE role = 'jefe_tecnologia'
+    `);
+
+        console.log('Users with jefe_tecnologia role removed.');
 
         // 2. Update the ENUM column definition
         console.log('Updating column definition...');

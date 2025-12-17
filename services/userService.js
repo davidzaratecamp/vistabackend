@@ -32,12 +32,12 @@ class UserService {
 
     // Role-based access control - Area segregation
     if (currentUserRole === 'jefe_desarrollo') {
-      // Development head can only see development team (desarrollador) and themselves
-      whereClause.role = { [Op.in]: ['jefe_desarrollo', 'desarrollador'] };
+      // Development head can only see development team (desarrollador, disenador) and themselves
+      whereClause.role = { [Op.in]: ['jefe_desarrollo', 'desarrollador', 'disenador'] };
     } else if (currentUserRole === 'jefe_workforce') {
       // Workforce head can only see workforce team and themselves
       whereClause.role = { [Op.in]: ['jefe_workforce', 'workforce'] };
-    } else if (currentUserRole === 'desarrollador' || currentUserRole === 'workforce') {
+    } else if (currentUserRole === 'desarrollador' || currentUserRole === 'workforce' || currentUserRole === 'disenador') {
       // Other roles can only see themselves
       whereClause.id = currentUserId;
     }
@@ -201,7 +201,8 @@ class UserService {
         jefe_desarrollo: users.filter(u => u.role === 'jefe_desarrollo').length,
         jefe_workforce: users.filter(u => u.role === 'jefe_workforce').length,
         desarrollador: users.filter(u => u.role === 'desarrollador').length,
-        workforce: users.filter(u => u.role === 'workforce').length
+        workforce: users.filter(u => u.role === 'workforce').length,
+        disenador: users.filter(u => u.role === 'disenador').length
       }
     };
 
@@ -210,10 +211,11 @@ class UserService {
 
   getAllowedRolesToCreate(currentRole) {
     const roleHierarchy = {
-      'jefe_desarrollo': ['desarrollador'],
+      'jefe_desarrollo': ['desarrollador', 'disenador'],
       'jefe_workforce': ['workforce'],
       'desarrollador': [],
-      'workforce': []
+      'workforce': [],
+      'disenador': []
     };
 
     return roleHierarchy[currentRole] || [];

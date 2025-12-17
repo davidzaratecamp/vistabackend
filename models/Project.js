@@ -45,6 +45,11 @@ const Project = sequelize.define('Project', {
       model: 'users',
       key: 'id'
     }
+  },
+  area: {
+    type: DataTypes.ENUM('desarrollo', 'workforce', 'tecnologia'),
+    allowNull: false,
+    defaultValue: 'desarrollo'
   }
 }, {
   tableName: 'projects',

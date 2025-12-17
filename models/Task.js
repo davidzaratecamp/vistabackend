@@ -60,6 +60,11 @@ const Task = sequelize.define('Task', {
       model: 'users',
       key: 'id'
     }
+  },
+  area: {
+    type: DataTypes.ENUM('desarrollo', 'workforce', 'tecnologia'),
+    allowNull: false,
+    defaultValue: 'desarrollo'
   }
 }, {
   tableName: 'tasks',

@@ -3,17 +3,23 @@ const { Op } = require('sequelize');
 
 class ProjectService {
   async createProject(projectData, userId) {
-    const project = await Project.create({
-      ...projectData,
-      createdBy: userId
-    });
-
-    // Get user to determine their role in the project
     const user = await User.findByPk(userId);
     
+    // Determine project area based on user role
+    let area = 'desarrollo';
+    if (user.role === 'jefe_workforce' || user.role === 'workforce') {
+      area = 'workforce';
+    }
+
+    const project = await Project.create({
+      ...projectData,
+      createdBy: userId,
+      area: area
+    });
+
     // Map user role to project role
-    let projectRole = 'desarrollador'; // default for jefe_desarrollo, jefe_workforce, desarrollador
-    if (user.role === 'workforce') {
+    let projectRole = 'desarrollador'; // default for jefe_desarrollo, desarrollador
+    if (user.role === 'jefe_workforce' || user.role === 'workforce') {
       projectRole = 'workforce';
     }
 
@@ -57,14 +63,29 @@ class ProjectService {
       ];
     }
 
+    // Area segregation - users can only see projects from their area
+    if (userRole === 'jefe_desarrollo' || userRole === 'desarrollador') {
+      whereClause.area = 'desarrollo';
+    } else if (userRole === 'jefe_workforce' || userRole === 'workforce') {
+      whereClause.area = 'workforce';
+    }
+
     // For non-jefe roles, filter projects where user is a member
     if (!['jefe_desarrollo', 'jefe_workforce'].includes(userRole)) {
       // We need to add a condition to show only projects where the user is a member
       // This will be handled by modifying the whereClause to include member check
-      whereClause[Op.or] = [
-        { createdBy: userId },
-        { '$members.id$': userId }
+      const existingOr = whereClause[Op.or] || [];
+      whereClause[Op.and] = [
+        { area: whereClause.area }, // Maintain area restriction
+        {
+          [Op.or]: [
+            { createdBy: userId },
+            { '$members.id$': userId },
+            ...existingOr
+          ]
+        }
       ];
+      delete whereClause.area; // Remove area from main where clause since it's now in Op.and
     }
 
     const projects = await Project.findAll({
