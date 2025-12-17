@@ -1,4 +1,4 @@
-const { Task, User, Project, TaskComment, ProjectMember } = require('../models');
+const { Task, User, Project, TaskComment, ProjectMember, TaskAssignee } = require('../models');
 const { Op } = require('sequelize');
 
 class TaskService {
@@ -19,11 +19,32 @@ class TaskService {
       throw new Error('Not authorized to create tasks in this project');
     }
 
+    // Extract assignees and create task without assignedTo
+    const { assignees, assignedTo, ...taskDataClean } = taskData;
+    
     const task = await Task.create({
-      ...taskData,
+      ...taskDataClean,
+      assignedTo: null, // We'll use the new system
       createdBy: userId,
       area: project.area // Inherit area from project
     });
+
+    // Handle multiple assignees
+    if (assignees && assignees.length > 0) {
+      const assigneePromises = assignees.map(assigneeId => 
+        TaskAssignee.create({
+          taskId: task.id,
+          userId: assigneeId
+        })
+      );
+      await Promise.all(assigneePromises);
+    } else if (assignedTo) {
+      // Backward compatibility: if assignedTo is provided, use it
+      await TaskAssignee.create({
+        taskId: task.id,
+        userId: assignedTo
+      });
+    }
 
     return this.getTaskById(task.id, userId);
   }
@@ -35,6 +56,12 @@ class TaskService {
         model: User,
         as: 'assignee',
         attributes: ['id', 'firstName', 'lastName', 'email']
+      },
+      {
+        model: User,
+        as: 'assignees',
+        attributes: ['id', 'firstName', 'lastName', 'email'],
+        through: { attributes: ['assignedAt'] }
       },
       {
         model: User,
@@ -87,7 +114,8 @@ class TaskService {
         { area: whereClause.area }, // Maintain area restriction
         {
           [Op.or]: [
-            { assignedTo: userId },
+            { assignedTo: userId }, // Legacy support
+            { '$assignees.id$': userId }, // New multi-assignee support
             { createdBy: userId },
             {
               '$project.members.id$': userId
@@ -98,7 +126,7 @@ class TaskService {
       ];
       delete whereClause.area; // Remove area from main where clause since it's now in Op.and
 
-      include[2].include = [{
+      include[3].include = [{
         model: User,
         as: 'members',
         attributes: ['id'],
@@ -122,6 +150,12 @@ class TaskService {
           model: User,
           as: 'assignee',
           attributes: ['id', 'firstName', 'lastName', 'email']
+        },
+        {
+          model: User,
+          as: 'assignees',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          through: { attributes: ['assignedAt'] }
         },
         {
           model: User,
@@ -159,6 +193,11 @@ class TaskService {
     const task = await Task.findByPk(taskId, {
       include: [
         {
+          model: User,
+          as: 'assignees',
+          through: { attributes: [] }
+        },
+        {
           model: Project,
           as: 'project',
           include: [
@@ -176,24 +215,53 @@ class TaskService {
       throw new Error('Task not found');
     }
 
-    const isAssignee = task.assignedTo === userId;
+    const isOldAssignee = task.assignedTo === userId;
+    const isNewAssignee = task.assignees.some(assignee => assignee.id === userId);
     const isCreator = task.createdBy === userId;
     const isProjectMember = task.project.members.some(member => member.id === userId);
     const isProjectCreator = task.project.createdBy === userId;
 
-    if (!isAssignee && !isCreator && !isProjectMember && !isProjectCreator) {
+    if (!isOldAssignee && !isNewAssignee && !isCreator && !isProjectMember && !isProjectCreator) {
       throw new Error('Not authorized to update this task');
     }
 
-    if (updateData.status === 'completado' && !updateData.completedDate) {
-      updateData.completedDate = new Date();
+    // Handle assignees update
+    const { assignees, assignedTo, ...taskUpdateData } = updateData;
+    
+    if (assignees !== undefined) {
+      // Remove all current assignees
+      await TaskAssignee.destroy({ where: { taskId } });
+      
+      // Add new assignees
+      if (assignees.length > 0) {
+        const assigneePromises = assignees.map(assigneeId => 
+          TaskAssignee.create({
+            taskId: taskId,
+            userId: assigneeId
+          })
+        );
+        await Promise.all(assigneePromises);
+      }
+    } else if (assignedTo !== undefined) {
+      // Backward compatibility: if assignedTo is provided, use it
+      await TaskAssignee.destroy({ where: { taskId } });
+      if (assignedTo) {
+        await TaskAssignee.create({
+          taskId: taskId,
+          userId: assignedTo
+        });
+      }
     }
 
-    if (updateData.status !== 'completado' && updateData.completedDate) {
-      updateData.completedDate = null;
+    if (taskUpdateData.status === 'completado' && !taskUpdateData.completedDate) {
+      taskUpdateData.completedDate = new Date();
     }
 
-    await task.update(updateData);
+    if (taskUpdateData.status !== 'completado' && taskUpdateData.completedDate) {
+      taskUpdateData.completedDate = null;
+    }
+
+    await task.update(taskUpdateData);
     return this.getTaskById(taskId, userId);
   }
 
@@ -265,7 +333,8 @@ class TaskService {
       [Op.and]: [
         {
           [Op.or]: [
-            { assignedTo: userId },
+            { assignedTo: userId }, // Legacy support
+            { '$assignees.id$': userId }, // New multi-assignee support
             { createdBy: userId }
           ]
         }
@@ -277,6 +346,7 @@ class TaskService {
       whereClause[Op.and].push({ area: 'desarrollo' });
     } else if (user.role === 'jefe_workforce' || user.role === 'workforce') {
       whereClause[Op.and].push({ area: 'workforce' });
+    }
 
     if (filters.status) {
       whereClause.status = filters.status;
@@ -290,6 +360,12 @@ class TaskService {
       where: whereClause,
       include: [
         {
+          model: User,
+          as: 'assignees',
+          attributes: ['id', 'firstName', 'lastName'],
+          through: { attributes: [] }
+        },
+        {
           model: Project,
           as: 'project',
           attributes: ['id', 'name', 'area']
@@ -299,7 +375,6 @@ class TaskService {
     });
 
     return tasks;
-  }
   }
 }
 

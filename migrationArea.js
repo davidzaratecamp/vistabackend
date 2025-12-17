@@ -8,18 +8,34 @@ async function addAreaColumns() {
         console.log('Database connection established.');
 
         console.log('Adding area column to projects table...');
-        await sequelize.query(`
-            ALTER TABLE projects 
-            ADD COLUMN IF NOT EXISTS area ENUM('desarrollo', 'workforce') 
-            NOT NULL DEFAULT 'desarrollo'
-        `);
+        try {
+            await sequelize.query(`
+                ALTER TABLE projects 
+                ADD COLUMN area ENUM('desarrollo', 'workforce', 'tecnologia') 
+                NOT NULL DEFAULT 'desarrollo'
+            `);
+        } catch (error) {
+            if (error.message.includes('Duplicate column name')) {
+                console.log('Area column already exists in projects table, skipping...');
+            } else {
+                throw error;
+            }
+        }
 
         console.log('Adding area column to tasks table...');
-        await sequelize.query(`
-            ALTER TABLE tasks 
-            ADD COLUMN IF NOT EXISTS area ENUM('desarrollo', 'workforce') 
-            NOT NULL DEFAULT 'desarrollo'
-        `);
+        try {
+            await sequelize.query(`
+                ALTER TABLE tasks 
+                ADD COLUMN area ENUM('desarrollo', 'workforce', 'tecnologia') 
+                NOT NULL DEFAULT 'desarrollo'
+            `);
+        } catch (error) {
+            if (error.message.includes('Duplicate column name')) {
+                console.log('Area column already exists in tasks table, skipping...');
+            } else {
+                throw error;
+            }
+        }
 
         console.log('Updating existing tasks to inherit area from their projects...');
         await sequelize.query(`

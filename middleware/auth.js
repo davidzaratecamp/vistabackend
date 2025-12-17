@@ -54,7 +54,7 @@ const isJefe = (req, res, next) => {
 };
 
 const isJefeOrDeveloper = (req, res, next) => {
-  return authorizeRoles('jefe_desarrollo', 'jefe_workforce', 'desarrollador', 'disenador')(req, res, next);
+  return authorizeRoles('jefe_desarrollo', 'jefe_workforce', 'desarrollador', 'disenador', 'workforce')(req, res, next);
 };
 
 module.exports = {

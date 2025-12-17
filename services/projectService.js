@@ -6,10 +6,16 @@ class ProjectService {
     const user = await User.findByPk(userId);
     
     // Determine project area based on user role
-let area = 'desarrollo';    if (user.role === 'jefe_workforce' || user.role === 'workforce') {      area = 'workforce';    }
+    let area = 'desarrollo';
+    if (user.role === 'jefe_workforce' || user.role === 'workforce') {
+      area = 'workforce';
+    }
+
+    // Extract members and create project without members field
+    const { members, ...projectDataClean } = projectData;
 
     const project = await Project.create({
-      ...projectData,
+      ...projectDataClean,
       createdBy: userId,
       area: area
     });
@@ -20,11 +26,36 @@ let area = 'desarrollo';    if (user.role === 'jefe_workforce' || user.role === 
       projectRole = 'workforce';
     }
 
+    // Add creator as member
     await ProjectMember.create({
       projectId: project.id,
       userId: userId,
       role: projectRole
     });
+
+    // Add selected members
+    if (members && members.length > 0) {
+      const memberPromises = members.map(async (memberId) => {
+        // Skip if it's the creator (already added)
+        if (memberId === userId) return;
+        
+        // Get user to determine their project role
+        const memberUser = await User.findByPk(memberId);
+        if (!memberUser) return;
+        
+        const memberProjectRole = (memberUser.role === 'jefe_workforce' || memberUser.role === 'workforce') 
+          ? 'workforce' 
+          : 'desarrollador';
+        
+        return ProjectMember.create({
+          projectId: project.id,
+          userId: memberId,
+          role: memberProjectRole
+        });
+      });
+      
+      await Promise.all(memberPromises.filter(Boolean));
+    }
 
     return this.getProjectById(project.id, userId);
   }
@@ -141,13 +172,50 @@ let area = 'desarrollo';    if (user.role === 'jefe_workforce' || user.role === 
 
     // Check if user is a department head or project creator
     const user = await User.findByPk(userId);
-    const isManager = user.role === 'jefe_desarrollo' || user.role === 'jefe_workforce';
+    const isManager = user.role === 'jefe_desarrollo' || user.role === 'jefe_workforce' || user.role === 'workforce';
 
     if (!isManager && project.createdBy !== userId) {
       throw new Error('Not authorized to update this project');
     }
 
-    await project.update(updateData);
+    // Handle members update
+    const { members, ...projectUpdateData } = updateData;
+    
+    if (members !== undefined) {
+      // Remove all current members except creator
+      await ProjectMember.destroy({ 
+        where: { 
+          projectId: projectId,
+          userId: { [Op.ne]: project.createdBy }
+        }
+      });
+      
+      // Add new members (excluding creator as they're already there)
+      if (members.length > 0) {
+        const memberPromises = members.map(async (memberId) => {
+          // Skip if it's the creator (already exists)
+          if (memberId === project.createdBy) return;
+          
+          // Get user to determine their project role
+          const memberUser = await User.findByPk(memberId);
+          if (!memberUser) return;
+          
+          const memberProjectRole = (memberUser.role === 'jefe_workforce' || memberUser.role === 'workforce') 
+            ? 'workforce' 
+            : 'desarrollador';
+          
+          return ProjectMember.create({
+            projectId: projectId,
+            userId: memberId,
+            role: memberProjectRole
+          });
+        });
+        
+        await Promise.all(memberPromises.filter(Boolean));
+      }
+    }
+
+    await project.update(projectUpdateData);
     return this.getProjectById(projectId, userId);
   }
 

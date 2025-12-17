@@ -3,6 +3,7 @@ const Project = require('./Project');
 const Task = require('./Task');
 const TaskComment = require('./TaskComment');
 const ProjectMember = require('./ProjectMember');
+const TaskAssignee = require('./TaskAssignee');
 
 User.hasMany(Project, { foreignKey: 'createdBy', as: 'createdProjects' });
 Project.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
@@ -28,6 +29,13 @@ Project.belongsToMany(User, { through: ProjectMember, foreignKey: 'projectId', a
 ProjectMember.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 ProjectMember.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
 
+// Task assignee relations (many-to-many)
+User.belongsToMany(Task, { through: TaskAssignee, foreignKey: 'userId', as: 'assignedTasksMultiple' });
+Task.belongsToMany(User, { through: TaskAssignee, foreignKey: 'taskId', as: 'assignees' });
+
+TaskAssignee.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+TaskAssignee.belongsTo(Task, { foreignKey: 'taskId', as: 'task' });
+
 // User hierarchy relations
 User.hasMany(User, { foreignKey: 'managerId', as: 'subordinates' });
 User.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
@@ -37,5 +45,6 @@ module.exports = {
   Project,
   Task,
   TaskComment,
-  ProjectMember
+  ProjectMember,
+  TaskAssignee
 };

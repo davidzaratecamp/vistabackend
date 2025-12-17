@@ -37,9 +37,12 @@ class UserService {
     } else if (currentUserRole === 'jefe_workforce') {
       // Workforce head can only see workforce team and themselves
       whereClause.role = { [Op.in]: ['jefe_workforce', 'workforce'] };
-    } else if (currentUserRole === 'desarrollador' || currentUserRole === 'workforce' || currentUserRole === 'disenador') {
-      // Other roles can only see themselves
-      whereClause.id = currentUserId;
+    } else if (currentUserRole === 'desarrollador' || currentUserRole === 'disenador') {
+      // Development team can see others in their area
+      whereClause.role = { [Op.in]: ['jefe_desarrollo', 'desarrollador', 'disenador'] };
+    } else if (currentUserRole === 'workforce') {
+      // Workforce team can see others in their area
+      whereClause.role = { [Op.in]: ['jefe_workforce', 'workforce'] };
     }
 
     const users = await User.findAll({
