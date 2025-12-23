@@ -376,6 +376,58 @@ class TaskService {
 
     return tasks;
   }
+
+  async updateTaskStatus(taskId, status, userId) {
+    const task = await Task.findByPk(taskId, {
+      include: [
+        {
+          model: User,
+          as: 'assignees',
+          through: { attributes: [] }
+        },
+        {
+          model: Project,
+          as: 'project',
+          include: [
+            {
+              model: User,
+              as: 'members',
+              through: { attributes: [] }
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    // Check if user has permission to update the task status
+    const isOldAssignee = task.assignedTo === userId;
+    const isNewAssignee = task.assignees.some(assignee => assignee.id === userId);
+    const isCreator = task.createdBy === userId;
+    const isProjectMember = task.project.members.some(member => member.id === userId);
+    const isProjectCreator = task.project.createdBy === userId;
+
+    if (!isOldAssignee && !isNewAssignee && !isCreator && !isProjectMember && !isProjectCreator) {
+      throw new Error('Not authorized to update this task status');
+    }
+
+    // Update the status and handle completedDate
+    const updateData = { status };
+    
+    if (status === 'completado' && !task.completedDate) {
+      updateData.completedDate = new Date();
+    }
+
+    if (status !== 'completado' && task.completedDate) {
+      updateData.completedDate = null;
+    }
+
+    await task.update(updateData);
+    return this.getTaskById(taskId, userId);
+  }
 }
 
 module.exports = new TaskService();
